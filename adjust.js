@@ -55,6 +55,11 @@ class Adjust {
       const adjustedPixel = pixel + value;
       return Math.max(0, Math.min(255, adjustedPixel));
     },
+    contrast(pixel, value) {
+      const adjustedPixel = 128 + (pixel - 128) * (1 + value / 100);
+      // const adjustedPixel = value * (pixel - 128);
+      return Math.max(0, Math.min(255, adjustedPixel));
+    },
   };
 
   #processPixels(type, value) {
