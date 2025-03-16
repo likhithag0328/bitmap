@@ -45,7 +45,7 @@ class Adjust {
 
     this.#width = this.#meta[18] | (this.#meta[19] << 8) |
       (this.#meta[20] << 16) | (this.#meta[21] << 24);
-    this.#padding = (4 - (this.#width * 3 % 4)) % 4;
+    this.#padding = (4 - (this.#width * 3) % 4) % 4;
     this.#rowWidth = this.#width * 3 + this.#padding;
   }
 
@@ -61,16 +61,14 @@ class Adjust {
   async processPixels(data, option, factor) {
     const adjustedPixels = new Uint8Array(data.length);
 
-    for (let index = 0; index < data.length - this.#padding; index += 3) {
+    for (let index = 0; index <= data.length - this.#padding - 3; index += 3) {
       const bgr = data.slice(index, index + 3);
-      if (index + 3 <= adjustedPixels.length) {
-        adjustedPixels.set(this.#adjust[option](bgr, factor), index);
-      }
+      adjustedPixels.set(this.#adjust[option](bgr, factor), index);
     }
 
     if (this.#padding > 0) {
       adjustedPixels.set(
-        data.slice(data.length - this.#padding),
+        data.slice(-this.#padding),
         data.length - this.#padding,
       );
     }
@@ -87,6 +85,10 @@ class Adjust {
         const changed = 128 + (c - 128) * (1 + value / 100);
         return Math.max(0, Math.min(255, changed));
       });
+    },
+    blackAndWhite([b, g, r]) {
+      const grayScale = Math.round(0.114 * b + 0.587 * g + 0.299 * r);
+      return [grayScale, grayScale, grayScale];
     },
   };
 
