@@ -3,80 +3,100 @@ class Adjust {
   #outputFile;
   #image;
   #output;
-  #isFirst;
   #meta;
-  #pixelData;
+  #width;
+  #padding;
+  #rowWidth;
 
   constructor(inputFile, outputFile) {
     this.#inputFile = inputFile;
     this.#outputFile = outputFile;
-    this.#isFirst = true;
     this.#meta = [];
-    this.#pixelData = [];
+    this.#width = 0;
+    this.#padding = 0;
+    this.#rowWidth = 0;
   }
 
-  async processImg(type, value) {
-    this.#image = (await Deno.open(this.#inputFile)).readable;
+  async processImg(option, factor) {
+    this.#image = await Deno.open(this.#inputFile);
     this.#output = await Deno.open(this.#outputFile, {
       create: true,
       write: true,
     });
+    this.writer = await this.#output.writable.getWriter();
 
-    const transform = new TransformStream({
-      transform: (chunk, controller) => {
-        if (this.#isFirst) {
-          this.#readHeaderAndPixelData(chunk);
-        } else {
-          this.#pixelData.push(...chunk);
-        }
-
-        const pixels = this.#processPixels(type, value);
-        controller.enqueue(new Uint8Array([...this.#meta, ...pixels]));
-        this.#clear();
-      },
-    });
-
-    this.#image.pipeThrough(transform).pipeTo(this.#output.writable);
+    await this.headerInfo(54);
+    await this.pixelsData(this.#rowWidth, option, factor);
+    await this.closeFiles();
   }
 
-  #readHeaderAndPixelData(chunk) {
-    this.#meta.push(...chunk.slice(0, 54));
-    this.#pixelData.push(...chunk.slice(54));
-    this.#isFirst = false;
+  async headerInfo(size) {
+    const buffer = new Uint8Array(size);
+    const bytesRead = await this.#image.read(buffer);
+
+    if (bytesRead === null) {
+      console.log("Error: Could not read file.");
+      await this.closeFiles();
+      return;
+    }
+
+    this.#meta = buffer.subarray(0, bytesRead);
+    await this.writer.write(this.#meta);
+
+    this.#width = this.#meta[18] | (this.#meta[19] << 8) |
+      (this.#meta[20] << 16) | (this.#meta[21] << 24);
+    this.#padding = (4 - (this.#width * 3 % 4)) % 4;
+    this.#rowWidth = this.#width * 3 + this.#padding;
   }
 
-  #clear() {
-    this.#meta = [];
-    this.#pixelData = [];
+  async pixelsData(size, option, factor) {
+    const buffer = new Uint8Array(size);
+    let bytesRead;
+
+    while ((bytesRead = await this.#image.read(buffer)) !== null) {
+      await this.processPixels(buffer.subarray(0, bytesRead), option, factor);
+    }
+  }
+
+  async processPixels(data, option, factor) {
+    const adjustedPixels = new Uint8Array(data.length);
+
+    for (let index = 0; index < data.length - this.#padding; index += 3) {
+      const bgr = data.slice(index, index + 3);
+      if (index + 3 <= adjustedPixels.length) {
+        adjustedPixels.set(this.#adjust[option](bgr, factor), index);
+      }
+    }
+
+    if (this.#padding > 0) {
+      adjustedPixels.set(
+        data.slice(data.length - this.#padding),
+        data.length - this.#padding,
+      );
+    }
+
+    await this.writer.write(adjustedPixels);
   }
 
   #adjust = {
-    brightness(pixel, value) {
-      const adjustedPixel = pixel + value;
-      return Math.max(0, Math.min(255, adjustedPixel));
+    brightness(components, factor) {
+      return components.map((c) => Math.max(0, Math.min(255, c + factor)));
     },
-    contrast(pixel, value) {
-      const adjustedPixel = 128 + (pixel - 128) * (1 + value / 100);
-      // const adjustedPixel = value * (pixel - 128);
-      return Math.max(0, Math.min(255, adjustedPixel));
+    contrast(components, value) {
+      return components.map((c) => {
+        const changed = 128 + (c - 128) * (1 + value / 100);
+        return Math.max(0, Math.min(255, changed));
+      });
     },
   };
 
-  #processPixels(type, value) {
-    if (!this.#adjust[type]) {
-      throw new Error(`Unknown adjustment type: ${type}`);
-    }
-
-    const pixels = [];
-    this.#pixelData.forEach((pixel) => {
-      const adjustedPixel = pixel === 0 ? 0 : this.#adjust[type](pixel, value);
-      pixels.push(adjustedPixel);
-    });
-    return pixels;
+  async closeFiles() {
+    if (this.#image) await this.#image.close();
+    if (this.#output) await this.#output.close();
   }
 }
 
 const processor = new Adjust(Deno.args[0], Deno.args[1]);
 const type = Deno.args[2] || "brightness";
-const value = parseInt(Deno.args[3]) || 0;
+const value = Number(Deno.args[3]) || 10;
 await processor.processImg(type, value);
