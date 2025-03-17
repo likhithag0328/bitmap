@@ -92,6 +92,19 @@ class ImageGenerator {
     await this.generateDIB();
   }
 
+  async generatePixels() {
+    const rowLength = this.meta.rowWidth;
+    const height = this.meta.height;
+
+    for (let index = 0; index < height; index++) {
+      const pixelData = new Uint8Array([
+        ...Array.from({ length: rowLength }).fill(255),
+      ]);
+
+      await this.writer.write(pixelData);
+    }
+  }
+
   async generate() {
     this.output = await Deno.open(this.outputFile, {
       create: true,
@@ -100,11 +113,13 @@ class ImageGenerator {
     this.writer = this.output.writable.getWriter();
 
     await this.generateHeader();
+
+    await this.generatePixels();
   }
 }
 
 const main = async () => {
-  const generator = new ImageGenerator("idk.txt", 2, 2);
+  const generator = new ImageGenerator(...Deno.args);
   await generator.generate();
 };
 
