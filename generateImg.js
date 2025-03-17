@@ -6,34 +6,32 @@ class ImageGenerator {
     this.meta.width = width;
   }
 
-  async generateBMP() {
-    const fileSize = this.meta.fileSize;
-    const bmpHeader = new Uint8Array([
-      0x42,
-      0x4D,
-      fileSize & 0xFF,
-      (fileSize >> 8) & 0xFF,
-      (fileSize >> 16) & 0xFF,
-      (fileSize >> 24) & 0xFF,
-      0x00,
-      0x00,
-      0x00,
-      0x00,
-      0x36,
-      0x00,
-      0x00,
-      0x00,
-    ]);
+  generateRandomColors(length) {
+    const randomArray = [];
+    for (let i = 0; i < length; i++) {
+      randomArray.push(Math.floor(Math.random() * 256));
+    }
 
-    await this.writer.write(bmpHeader);
+    return randomArray;
   }
 
-  generateMetaInfo() {
-    this.meta.bpp = 3;
-    this.meta.padding = (4 - (this.meta.width * this.meta.bpp) % 4) % 4;
-    this.meta.rowWidth = (this.meta.width * this.meta.bpp) + this.meta.padding;
-    this.meta.pixelDataSize = this.meta.rowWidth * this.meta.height;
-    this.meta.fileSize = 54 + this.meta.pixelDataSize;
+  async generatePixels() {
+    const rowLength = this.meta.rowWidth;
+    const height = this.meta.height;
+
+    // const colors = this.generateRandomColors(rowLength);
+    // for (let index = 0; index < height; index++) {
+    //   const pixelData = new Uint8Array([
+    //     ...colors,
+    //   ]);
+
+    for (let index = 0; index < height; index++) {
+      const pixelData = new Uint8Array([
+        ...this.generateRandomColors(rowLength),
+      ]);
+
+      await this.writer.write(pixelData);
+    }
   }
 
   async generateDIB() {
@@ -86,31 +84,40 @@ class ImageGenerator {
     await this.writer.write(dibHeader);
   }
 
+  async generateBMP() {
+    const fileSize = this.meta.fileSize;
+    const bmpHeader = new Uint8Array([
+      0x42,
+      0x4D,
+      fileSize & 0xFF,
+      (fileSize >> 8) & 0xFF,
+      (fileSize >> 16) & 0xFF,
+      (fileSize >> 24) & 0xFF,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x36,
+      0x00,
+      0x00,
+      0x00,
+    ]);
+
+    await this.writer.write(bmpHeader);
+  }
+
+  generateMetaInfo() {
+    this.meta.bpp = 3;
+    this.meta.padding = (4 - (this.meta.width * this.meta.bpp) % 4) % 4;
+    this.meta.rowWidth = (this.meta.width * this.meta.bpp) + this.meta.padding;
+    this.meta.pixelDataSize = this.meta.rowWidth * this.meta.height;
+    this.meta.fileSize = 54 + this.meta.pixelDataSize;
+  }
+
   async generateHeader() {
     this.generateMetaInfo();
     await this.generateBMP();
     await this.generateDIB();
-  }
-  generateRandomColors(length) {
-    const randomArray = [];
-    for (let i = 0; i < length; i++) {
-      randomArray.push(Math.floor(Math.random() * 256));
-    }
-
-    return randomArray;
-  }
-
-  async generatePixels() {
-    const rowLength = this.meta.rowWidth;
-    const height = this.meta.height;
-
-    for (let index = 0; index < height; index++) {
-      const pixelData = new Uint8Array([
-        ...this.generateRandomColors(rowLength),
-      ]);
-
-      await this.writer.write(pixelData);
-    }
   }
 
   async generate() {
