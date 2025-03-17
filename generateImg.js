@@ -91,6 +91,14 @@ class ImageGenerator {
     await this.generateBMP();
     await this.generateDIB();
   }
+  generateRandomColors(length) {
+    const randomArray = [];
+    for (let i = 0; i < length; i++) {
+      randomArray.push(Math.floor(Math.random() * 256));
+    }
+
+    return randomArray;
+  }
 
   async generatePixels() {
     const rowLength = this.meta.rowWidth;
@@ -98,7 +106,7 @@ class ImageGenerator {
 
     for (let index = 0; index < height; index++) {
       const pixelData = new Uint8Array([
-        ...Array.from({ length: rowLength }).fill(255),
+        ...this.generateRandomColors(rowLength),
       ]);
 
       await this.writer.write(pixelData);
