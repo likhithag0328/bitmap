@@ -1,3 +1,12 @@
+const generateRandomArray = (length) => {
+  const randomArray = [];
+  for (let i = 0; i < length; i++) {
+    randomArray.push(Math.floor(Math.random() * 256));
+  }
+
+  return randomArray;
+};
+
 class ImageGenerator {
   constructor(outputFile, height, width) {
     this.outputFile = outputFile;
@@ -6,20 +15,11 @@ class ImageGenerator {
     this.meta.width = width;
   }
 
-  generateRandomColors(length) {
-    const randomArray = [];
-    for (let i = 0; i < length; i++) {
-      randomArray.push(Math.floor(Math.random() * 256));
-    }
-
-    return randomArray;
-  }
-
   async generatePixels() {
     const rowLength = this.meta.rowWidth;
     const height = this.meta.height;
 
-    // const colors = this.generateRandomColors(rowLength);
+    // const colors = generateRandomArray(rowLength);
     // for (let index = 0; index < height; index++) {
     //   const pixelData = new Uint8Array([
     //     ...colors,
@@ -27,7 +27,7 @@ class ImageGenerator {
 
     for (let index = 0; index < height; index++) {
       const pixelData = new Uint8Array([
-        ...this.generateRandomColors(rowLength),
+        ...generateRandomArray(rowLength),
       ]);
 
       await this.writer.write(pixelData);
