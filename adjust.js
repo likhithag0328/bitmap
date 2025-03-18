@@ -22,8 +22,9 @@ class ImgProcessor {
 
   async redirectBmpHeader() {
     const buffer = new Uint8Array(14);
-    const bytesRead = await this.imgStream.read(buffer);
-    this.meta.bmp = buffer.subarray(0, bytesRead);
+    await this.imgStream.read(buffer);
+
+    this.meta.bmp = buffer;
     await this.writer.write(this.meta.bmp);
   }
 
@@ -48,29 +49,18 @@ class ImgProcessor {
     },
 
     negative: (components) => components.map((c) => 255 - c),
+
+    saturation: (triplet, factor) => {
+      const avg = triplet.reduce((a, b) => a + b, 0) / 3;
+      return triplet.map((value) => {
+        if (factor === 0) return value;
+
+        const adjustedValue = avg + (value - avg) * Math.exp(factor / 10);
+
+        return Math.round(adjustedValue);
+      }).map((v) => Math.max(0, Math.min(255, v)));
+    },
   };
-
-  // async redirectPixels(data, option, factor) {
-  //   const adjustedPixels = new Uint8Array(data.length);
-
-  //   for (let index = 0; index <= data.length - this.meta.padding - 3; index += 3) {
-  //     const bgr = data.slice(index, index + 3);
-  //     const adjusted = this.adjust[option](bgr, factor);
-
-  //     if (index + 3 <= adjustedPixels.length) {
-  //       adjustedPixels.set(adjusted, index);
-  //     }
-  //   }
-
-  //   if (this.meta.padding > 0) {
-  //     adjustedPixels.set(
-  //       data.slice(-this.meta.padding),
-  //       data.length - this.meta.padding
-  //     );
-  //   }
-
-  //   await this.writer.write(adjustedPixels);
-  // }
 
   async redirectPixels(data, option, factor) {
     const adjustedPixels = new Uint8Array(data.length);
@@ -95,10 +85,9 @@ class ImgProcessor {
   async transformPixels(option, factor) {
     const chunkSize = this.meta.rowWidth;
     const buffer = new Uint8Array(chunkSize);
-    let bytesRead;
 
-    while ((bytesRead = await this.imgStream.read(buffer)) !== null) {
-      await this.redirectPixels(buffer.subarray(0, bytesRead), option, factor);
+    while (await this.imgStream.read(buffer)) {
+      await this.redirectPixels(buffer, option, factor);
     }
   }
 
@@ -106,9 +95,9 @@ class ImgProcessor {
     await this.redirectBmpHeader();
     const size = this.read4Bytes(this.meta.bmp, 10) - this.meta.bmp.length;
     const buffer = new Uint8Array(size);
-    const bytesRead = await this.imgStream.read(buffer);
+    await this.imgStream.read(buffer);
 
-    this.meta.dib = buffer.subarray(0, bytesRead);
+    this.meta.dib = buffer;
     this.meta.width = this.read4Bytes(this.meta.dib, 4);
     this.meta.padding = (4 - (this.meta.width * 3) % 4) % 4;
     this.meta.rowWidth = this.meta.width * 3 + this.meta.padding;
@@ -120,7 +109,7 @@ class ImgProcessor {
     await this.openFiles();
     await this.redirectHeader();
     await this.transformPixels(option, factor);
-    await this.closeFiles();
+    this.closeFiles();
   }
 }
 
