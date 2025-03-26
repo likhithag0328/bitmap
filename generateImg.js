@@ -19,16 +19,16 @@ class ImageGenerator {
     const rowLength = this.meta.rowWidth;
     const height = this.meta.height;
 
-    // const colors = generateRandomArray(rowLength);
     // for (let index = 0; index < height; index++) {
+    //   const colors = generateRandomArray(rowLength);
     //   const pixelData = new Uint8Array([
     //     ...colors,
     //   ]);
 
-    for (let index = 0; index < height; index++) {
-      const pixelData = new Uint8Array([
-        ...generateRandomArray(rowLength),
-      ]);
+      for (let index = 0; index < height; index++) {
+        const pixelData = new Uint8Array([
+          ...generateRandomArray(rowLength),
+        ]);
 
       await this.writer.write(pixelData);
     }
