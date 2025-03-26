@@ -1,19 +1,21 @@
+const read4Bytes = (chunk, start) => {
+  return new DataView(chunk.buffer).getInt32(start, true);
+};
+
 class ImgProcessor {
-  constructor(inputFile, outputFile) {
-    this.inputFile = inputFile;
-    this.outputFile = outputFile;
+  constructor(inStream, outStream) {
+    this.imgStream = inStream;
+    this.output = outStream;
     this.meta = {};
   }
 
-  async openFiles() {
-    this.imgStream = await Deno.open(this.inputFile);
-    this.output = await Deno.open(this.outputFile, {
-      create: true,
-      write: true,
-    });
-
-    this.writer = this.output.writable.getWriter();
-  }
+  // async openFiles() {
+  //   this.imgStream = await Deno.open(this.inputFile);
+  //   this.output = await Deno.open(this.outputFile, {
+  //     create: true,
+  //     write: true,
+  //   });
+  // }
 
   closeFiles() {
     if (this.imgStream) this.imgStream.close();
@@ -26,10 +28,6 @@ class ImgProcessor {
 
     this.meta.bmp = buffer;
     await this.writer.write(this.meta.bmp);
-  }
-
-  read4Bytes(chunk, start) {
-    return new DataView(chunk.buffer).getInt32(start, true);
   }
 
   adjust = {
@@ -93,12 +91,12 @@ class ImgProcessor {
 
   async redirectHeader() {
     await this.redirectBmpHeader();
-    const size = this.read4Bytes(this.meta.bmp, 10) - this.meta.bmp.length;
+    const size = read4Bytes(this.meta.bmp, 10) - this.meta.bmp.length;
     const buffer = new Uint8Array(size);
     await this.imgStream.read(buffer);
 
     this.meta.dib = buffer;
-    this.meta.width = this.read4Bytes(this.meta.dib, 4);
+    this.meta.width = read4Bytes(this.meta.dib, 4);
     this.meta.padding = (4 - (this.meta.width * 3) % 4) % 4;
     this.meta.rowWidth = this.meta.width * 3 + this.meta.padding;
 
@@ -106,7 +104,7 @@ class ImgProcessor {
   }
 
   async processImg(option, factor) {
-    await this.openFiles();
+    this.writer = this.output.writable.getWriter();
     await this.redirectHeader();
     await this.transformPixels(option, factor);
     this.closeFiles();
@@ -119,6 +117,13 @@ const parseArgs = (options) => {
 
 const main = async () => {
   const [inputFile, outputFile, ...adjustments] = Deno.args;
+
+  const imgStream = await Deno.open(inputFile);
+  const output = await Deno.open(outputFile, {
+    create: true,
+    write: true,
+  });
+
   const [option, factor] = parseArgs(adjustments);
 
   if (!(option in new ImgProcessor().adjust)) {
@@ -126,7 +131,7 @@ const main = async () => {
     Deno.exit(1);
   }
 
-  const processor = new ImgProcessor(inputFile, outputFile);
+  const processor = new ImgProcessor(imgStream, output);
   await processor.processImg(option, factor);
 };
 
