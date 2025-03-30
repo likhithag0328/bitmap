@@ -1,4 +1,4 @@
-adjust = {
+const adjust = {
   brightness: (components, factor) =>
     components.map((c) => Math.max(0, Math.min(255, c + factor))),
 
@@ -15,6 +15,16 @@ adjust = {
   },
 
   negative: (components) => components.map((c) => 255 - c),
+
+  saturation: (bgr, factor) => {
+    const [b, g, r] = bgr;
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    return [
+      Math.max(0, Math.min(255, gray + (b - gray) * (1 + factor / 100))),
+      Math.max(0, Math.min(255, gray + (g - gray) * (1 + factor / 100))),
+      Math.max(0, Math.min(255, gray + (r - gray) * (1 + factor / 100))),
+    ];
+  },
 };
 
 const read4Bytes = (chunk, start) => {
@@ -48,7 +58,7 @@ class ImgProcessor {
       if (index + 3 > data.length - this.meta.padding) break;
 
       const bgr = data.subarray(index, index + 3);
-      adjustedPixels.set(this.adjust[option](bgr, factor), index);
+      adjustedPixels.set(adjust[option](bgr, factor), index);
     }
 
     if (this.meta.padding > 0) {
@@ -107,7 +117,7 @@ const main = async () => {
 
   const [option, factor] = parseArgs(adjustments);
 
-  if (!(option in new ImgProcessor().adjust)) {
+  if (!(option in adjust)) {
     console.error(`Invalid adjustment type: ${option}`);
     Deno.exit(1);
   }
