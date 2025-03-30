@@ -1,3 +1,22 @@
+adjust = {
+  brightness: (components, factor) =>
+    components.map((c) => Math.max(0, Math.min(255, c + factor))),
+
+  contrast: (components, value) =>
+    components.map((c) => {
+      const changed = 128 + (c - 128) * (1 + value / 100);
+      return Math.max(0, Math.min(255, changed));
+    }),
+
+  "black-and-white": (bgr) => {
+    const [b, g, r] = bgr;
+    const grayValue = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+    return [grayValue, grayValue, grayValue];
+  },
+
+  negative: (components) => components.map((c) => 255 - c),
+};
+
 const read4Bytes = (chunk, start) => {
   return new DataView(chunk.buffer).getInt32(start, true);
 };
@@ -8,14 +27,6 @@ class ImgProcessor {
     this.output = outStream;
     this.meta = {};
   }
-
-  // async openFiles() {
-  //   this.imgStream = await Deno.open(this.inputFile);
-  //   this.output = await Deno.open(this.outputFile, {
-  //     create: true,
-  //     write: true,
-  //   });
-  // }
 
   closeFiles() {
     if (this.imgStream) this.imgStream.close();
@@ -29,36 +40,6 @@ class ImgProcessor {
     this.meta.bmp = buffer;
     await this.writer.write(this.meta.bmp);
   }
-
-  adjust = {
-    brightness: (components, factor) =>
-      components.map((c) => Math.max(0, Math.min(255, c + factor))),
-
-    contrast: (components, value) =>
-      components.map((c) => {
-        const changed = 128 + (c - 128) * (1 + value / 100);
-        return Math.max(0, Math.min(255, changed));
-      }),
-
-    "black-and-white": (bgr) => {
-      const [b, g, r] = bgr;
-      const grayValue = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-      return [grayValue, grayValue, grayValue];
-    },
-
-    negative: (components) => components.map((c) => 255 - c),
-
-    saturation: (triplet, factor) => {
-      const avg = triplet.reduce((a, b) => a + b, 0) / 3;
-      return triplet.map((value) => {
-        if (factor === 0) return value;
-
-        const adjustedValue = avg + (value - avg) * Math.exp(factor / 10);
-
-        return Math.round(adjustedValue);
-      }).map((v) => Math.max(0, Math.min(255, v)));
-    },
-  };
 
   async redirectPixels(data, option, factor) {
     const adjustedPixels = new Uint8Array(data.length);
